@@ -1,0 +1,142 @@
+#include <Wire.h>
+#include <Servo.h>
+
+#define TRIGPIN 13
+#define ECHOPIN 12
+#define REDLED 16
+#define BLUELED 17
+#define LSM1 2
+#define LSM2 4
+
+#define leftMotorForward 27
+#define leftMotorBackward 26
+#define rightMotorForward 33
+#define rightMotorBackward 32
+
+int max_range = 11;
+
+Servo myservo;
+
+void setup() {
+  pinMode(TRIGPIN, OUTPUT);
+  pinMode(ECHOPIN, INPUT);
+  pinMode(REDLED, OUTPUT);
+  pinMode(BLUELED, OUTPUT);
+  pinMode(LSM1, INPUT);
+  pinMode(LSM2, INPUT);
+
+  pinMode(leftMotorForward, OUTPUT);
+  pinMode(leftMotorBackward, OUTPUT);
+  pinMode(rightMotorForward, OUTPUT);
+  pinMode(rightMotorBackward, OUTPUT);
+
+  myservo.attach(14);
+  myservo.write(90);
+
+  Serial.begin(115200);
+}
+
+void loop() {
+  int barrierCode = detectBarrier(); // Read the barrier code
+  followLine(); // Line following logic
+
+  // Update LED action based on barrier code
+  switch (barrierCode) {
+    case 0:  // 0 0 - No LEDs on
+      digitalWrite(REDLED, LOW);
+      digitalWrite(BLUELED, LOW);
+      break;
+    case 1:  // 0 1 - Red LED ON, blue LED OFF
+      digitalWrite(REDLED, HIGH);
+      digitalWrite(BLUELED, LOW);
+      break;
+    case 2:  // 1 0 - Red LED OFF, blue LED ON
+      digitalWrite(REDLED, LOW);
+      digitalWrite(BLUELED, HIGH);
+      break;
+    case 3:  // 1 1 - Both LEDs ON
+      digitalWrite(REDLED, HIGH);
+      digitalWrite(BLUELED, HIGH);
+      break;
+  }
+}
+
+int detectBarrier() {
+  int barrierCode = 0;
+  long duration, distance;
+
+  digitalWrite(TRIGPIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIGPIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIGPIN, LOW);
+  duration = pulseIn(ECHOPIN, HIGH);
+  distance = duration * 0.0344 / 2;
+
+  if (distance <= max_range) {
+    // Check servo angle and hole size
+    myservo.write(0);
+    delay(1000);
+    long duration1 = pulseIn(ECHOPIN, HIGH);
+    long distance1 = duration1 * 0.0344 / 2;
+    if (distance1 <= max_range) {
+      barrierCode += 2;
+    }
+
+    myservo.write(180);
+    delay(1000);
+    long duration2 = pulseIn(ECHOPIN, HIGH);
+    long distance2 = duration2 * 0.0344 / 2;
+    if (distance2 <= max_range) {
+      barrierCode += 1;
+    }
+
+    myservo.write(90);
+    delay(1000);
+  }
+
+  return barrierCode;
+}
+
+void followLine() {
+  int leftSensor = digitalRead(LSM1);
+  int rightSensor = digitalRead(LSM2);
+
+  if (!leftSensor && !rightSensor) {
+    moveForward();
+  } else if (!leftSensor && rightSensor) {
+    turnLeft();
+  } else if (leftSensor && !rightSensor) {
+    turnRight();
+  } else {
+    stopMoving();
+  }
+}
+
+void moveForward() {
+  digitalWrite(leftMotorForward, HIGH);
+  digitalWrite(leftMotorBackward, LOW);
+  digitalWrite(rightMotorForward, HIGH);
+  digitalWrite(rightMotorBackward, LOW);
+}
+
+void turnLeft() {
+  digitalWrite(leftMotorForward, LOW);
+  digitalWrite(leftMotorBackward, LOW);
+  digitalWrite(rightMotorForward, HIGH);
+  digitalWrite(rightMotorBackward, LOW);
+}
+
+void turnRight() {
+  digitalWrite(leftMotorForward, HIGH);
+  digitalWrite(leftMotorBackward, LOW);
+  digitalWrite(rightMotorForward, LOW);
+  digitalWrite(rightMotorBackward, LOW);
+}
+
+void stopMoving() {
+  digitalWrite(leftMotorForward, LOW);
+  digitalWrite(leftMotorBackward, LOW);
+  digitalWrite(rightMotorForward, LOW);
+  digitalWrite(rightMotorBackward, LOW);
+}
